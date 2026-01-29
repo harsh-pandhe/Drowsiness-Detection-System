@@ -1,14 +1,15 @@
 {
   "name": "drowsiness-detector",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "SentinelEye - Real-time drowsiness detection system using MediaPipe and Node.js",
+  "main": "server.js",
   "scripts": {
+    "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": ["drowsiness", "detection", "mediapipe", "computer-vision", "driver-safety"],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "type": "commonjs",
   "dependencies": {
     "express": "^5.2.1"
