@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SentinelEye | Drowsiness Detection</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- MediaPipe Tasks Vision -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.js" crossorigin="anonymous"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@500&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .mono { font-family: 'JetBrains+Mono', monospace; }
+        .critical-glow { box-shadow: 0 0 30px rgba(239, 68, 68, 0.4); }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/50 backdrop-blur-md sticky top-0 z-10">
+        <div class="flex items-center gap-3">
+            <div class="bg-blue-600 p-2 rounded-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight">SentinelEye Node</h1>
+                <p class="text-xs text-slate-400 uppercase tracking-widest font-semibold">Driver Monitoring System</p>
+            </div>
+        </div>
+        
+        <div id="model-status" class="px-4 py-1.5 rounded-full border border-slate-700 bg-slate-800 text-slate-400 text-sm font-medium flex items-center gap-2">
+            <div class="w-2 h-2 rounded-full bg-slate-500"></div>
+            Loading Engine...
+        </div>
+    </header>
+
+    <main class="flex-1 p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-7xl mx-auto w-full">
+        
+        <!-- Left: Diagnostics -->
+        <div class="space-y-6">
+            <section class="bg-slate-900 rounded-3xl p-6 border border-slate-800 shadow-xl">
+                <h2 class="text-slate-400 text-sm font-bold uppercase mb-6 tracking-wider flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                    Live Diagnostics
+                </h2>
+                
+                <div class="space-y-8">
+                    <div class="relative pt-1">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-blue-400 bg-blue-400/10">Eye Aspect Ratio</span>
+                            <span id="ear-value" class="text-xl mono font-bold text-blue-400">0.000</span>
+                        </div>
+                        <div class="overflow-hidden h-3 mb-4 text-xs flex rounded-full bg-slate-800">
+                            <div id="ear-progress" class="bg-blue-500 transition-all duration-100" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col gap-4">
+                        <div class="flex items-center justify-between p-4 bg-slate-800/50 rounded-2xl border border-slate-700">
+                            <span class="text-slate-400 text-sm">System Latency</span>
+                            <span id="latency" class="text-sm font-bold text-slate-200">-- ms</span>
+                        </div>
+                        <div class="flex items-center justify-between p-4 bg-slate-800/50 rounded-2xl border border-slate-700">
+                            <span class="text-slate-400 text-sm">Sensitivity</span>
+                            <span class="text-sm font-bold text-slate-200">0.22 EAR</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <button id="start-btn" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-900/20 disabled:opacity-50">
+                Activate Sensor
+            </button>
+        </div>
+
+        <!-- Center: Video Feed -->
+        <div class="lg:col-span-2 space-y-6">
+            <div id="feed-container" class="relative bg-black rounded-3xl overflow-hidden shadow-2xl border-4 border-slate-900 aspect-video">
+                <video id="webcam" class="absolute inset-0 w-full h-full object-cover grayscale opacity-50" autoplay playsinline muted></video>
+                <canvas id="output_canvas" class="absolute inset-0 w-full h-full z-10 pointer-events-none"></canvas>
+                
+                <div id="placeholder" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/90 z-20 text-center px-10">
+                    <div class="w-16 h-16 bg-blue-600/20 rounded-full flex items-center justify-center mb-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-500"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">Sensor Connection Required</h3>
+                    <p class="text-slate-400 text-sm">Click 'Activate Sensor' to begin real-time eye tracking.</p>
+                </div>
+
+                <div id="alert-ui" class="hidden absolute bottom-6 inset-x-6 flex items-end justify-between pointer-events-none z-30">
+                    <div class="flex flex-col">
+                        <span class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Detection Status</span>
+                        <div id="status-text" class="text-4xl font-black tracking-tighter text-green-500 uppercase">AWAKE</div>
+                    </div>
+                    
+                    <div id="danger-card" class="hidden bg-red-600 text-white p-6 rounded-2xl flex items-center gap-4 animate-bounce shadow-2xl">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        <div>
+                            <div class="text-lg font-black leading-none">WAKE UP!</div>
+                            <div class="text-xs font-bold opacity-80 uppercase tracking-wide">Danger Detected</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script type="module">
+        import { FaceLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
+
+        const video = document.getElementById("webcam");
+        const canvas = document.getElementById("output_canvas");
+        const ctx = canvas.getContext("2d");
+        const earEl = document.getElementById("ear-value");
+        const earProgress = document.getElementById("ear-progress");
+        const statusText = document.getElementById("status-text");
+        const dangerCard = document.getElementById("danger-card");
+        const alertUI = document.getElementById("alert-ui");
+        const startBtn = document.getElementById("start-btn");
+        const statusBadge = document.getElementById("model-status");
+
+        let faceLandmarker;
+        let runningMode = "VIDEO";
+        const EAR_THRESHOLD = 0.22;
+        const DROWSY_TIME = 1500;
+        let closureStartTime = null;
+
+        // Initialize MediaPipe
+        async function init() {
+            const filesetResolver = await FilesetResolver.forVisionTasks(
+                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+            );
+            faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+                baseOptions: {
+                    modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
+                    delegate: "GPU"
+                },
+                outputFaceBlendshapes: true,
+                runningMode: runningMode,
+                numFaces: 1
+            });
+            statusBadge.innerHTML = `<div class="w-2 h-2 rounded-full bg-green-500"></div> AI Ready`;
+            startBtn.disabled = false;
+        }
+
+        function calculateEAR(landmarks) {
+            const dist = (p1, p2) => Math.hypot(p1.x - p2.x, p1.y - p2.y);
+            
+            // Left Eye
+            const v1 = dist(landmarks[160], landmarks[144]);
+            const v2 = dist(landmarks[158], landmarks[153]);
+            const h1 = dist(landmarks[33], landmarks[133]);
+            const leftEAR = (v1 + v2) / (2.0 * h1);
+
+            // Right Eye
+            const v3 = dist(landmarks[385], landmarks[380]);
+            const v4 = dist(landmarks[387], landmarks[373]);
+            const h2 = dist(landmarks[362], landmarks[263]);
+            const rightEAR = (v3 + v4) / (2.0 * h2);
+
+            return (leftEAR + rightEAR) / 2.0;
+        }
+
+        async function predictWebcam() {
+            let startTimeMs = performance.now();
+            const results = faceLandmarker.detectForVideo(video, startTimeMs);
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (results.faceLandmarks && results.faceLandmarks.length > 0) {
+                const landmarks = results.faceLandmarks[0];
+                const ear = calculateEAR(landmarks);
+                
+                earEl.innerText = ear.toFixed(3);
+                earProgress.style.width = `${Math.min(ear * 250, 100)}%`;
+                
+                if (ear < EAR_THRESHOLD) {
+                    if (!closureStartTime) closureStartTime = Date.now();
+                    const duration = Date.now() - closureStartTime;
+                    
+                    if (duration > DROWSY_TIME) {
+                        statusText.innerText = "CRITICAL";
+                        statusText.className = "text-4xl font-black tracking-tighter text-red-500 animate-pulse uppercase";
+                        dangerCard.classList.remove("hidden");
+                        earProgress.className = "bg-red-500 transition-all duration-100";
+                    } else {
+                        statusText.innerText = "DROWSY";
+                        statusText.className = "text-4xl font-black tracking-tighter text-orange-500 uppercase";
+                    }
+                } else {
+                    closureStartTime = null;
+                    statusText.innerText = "AWAKE";
+                    statusText.className = "text-4xl font-black tracking-tighter text-green-500 uppercase";
+                    dangerCard.classList.add("hidden");
+                    earProgress.className = "bg-blue-500 transition-all duration-100";
+                }
+
+                // Draw Eye Dots
+                const eyeIndices = [33, 133, 160, 144, 158, 153, 362, 263, 385, 380, 387, 373];
+                ctx.fillStyle = ear < EAR_THRESHOLD ? "#ef4444" : "#10b981";
+                eyeIndices.forEach(idx => {
+                    const p = landmarks[idx];
+                    ctx.beginPath();
+                    ctx.arc(p.x * canvas.width, p.y * canvas.height, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+            }
+
+            window.requestAnimationFrame(predictWebcam);
+        }
+
+        startBtn.addEventListener("click", () => {
+            navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
+                video.srcObject = stream;
+                document.getElementById("placeholder").classList.add("hidden");
+                alertUI.classList.remove("hidden");
+                startBtn.classList.add("hidden");
+                video.addEventListener("loadeddata", () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    predictWebcam();
+                });
+            });
+        });
+
+        init();
+    </script>
+</body>
+</html>
