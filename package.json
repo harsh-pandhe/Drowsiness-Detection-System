@@ -7,11 +7,18 @@
     "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["drowsiness", "detection", "mediapipe", "computer-vision", "driver-safety"],
+  "keywords": [
+    "drowsiness",
+    "detection",
+    "mediapipe",
+    "computer-vision",
+    "driver-safety"
+  ],
   "author": "",
   "license": "MIT",
   "type": "commonjs",
   "dependencies": {
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3"
   }
 }
