@@ -1,309 +1,219 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SentinelEye Pro | Multi-Modal DMS</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.js" crossorigin="anonymous"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@500&display=swap');
-        body { font-family: 'Inter', sans-serif; cursor: crosshair; }
-        .mono { font-family: 'JetBrains+Mono', monospace; }
-        .scanning-line {
-            height: 2px;
-            background: linear-gradient(90deg, transparent, #3b82f6, transparent);
-            width: 100%;
-            position: absolute;
-            top: 0;
-            animation: scan 3s linear infinite;
-            z-index: 20;
-        }
-        @keyframes scan {
-            0% { top: 0%; }
-            100% { top: 100%; }
-        }
-        .glow-red { box-shadow: 0 0 20px rgba(239, 68, 68, 0.5); }
-    </style>
+<meta charset="UTF-8">
+<title>SentinelDrive | Driver DMS</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.js"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+body {
+  font-family: 'Orbitron', sans-serif;
+  background: radial-gradient(circle at top, #020617, #000);
+}
+.glow-green { box-shadow: 0 0 30px #22c55e66; }
+.glow-yellow { box-shadow: 0 0 30px #eab30866; }
+.glow-red { box-shadow: 0 0 40px #ef444466; }
+.pulse { animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+</style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col overflow-hidden">
 
-    <!-- Header -->
-    <header class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/80 backdrop-blur-xl z-50">
-        <div class="flex items-center gap-3">
-            <div class="bg-blue-600 p-2 rounded-lg shadow-lg shadow-blue-500/20">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            </div>
-            <div>
-                <h1 class="text-lg font-extrabold tracking-tight">SENTINELEYE <span class="text-blue-500">PRO</span></h1>
-                <p class="text-[10px] text-slate-500 uppercase tracking-[0.2em] font-bold">Multi-Modal Fatigue Detection</p>
-            </div>
-        </div>
-        
-        <div class="flex items-center gap-4">
-            <div id="connection-status" class="px-3 py-1 rounded-full border border-slate-700 bg-slate-800/50 text-[10px] font-bold flex items-center gap-2">
-                <div class="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse"></div>
-                ENGINE OFFLINE
-            </div>
-            <button id="mute-btn" class="p-2 bg-slate-800 rounded-lg hover:bg-slate-700 transition-colors">
-                <svg id="mute-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-            </button>
-        </div>
-    </header>
+<body class="h-screen flex text-white overflow-hidden">
 
-    <main class="flex-1 p-4 grid grid-cols-1 lg:grid-cols-4 gap-4 overflow-hidden">
-        
-        <!-- Metrics Sidebar -->
-        <div class="space-y-4 overflow-y-auto pr-2">
-            <!-- EAR Metric -->
-            <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-4">
-                <div class="flex justify-between items-end mb-2">
-                    <span class="text-[10px] font-black text-slate-500 uppercase">Eyes (EAR)</span>
-                    <span id="ear-val" class="text-lg mono font-bold text-blue-400">0.00</span>
-                </div>
-                <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                    <div id="ear-bar" class="h-full bg-blue-500 transition-all duration-75" style="width: 0%"></div>
-                </div>
-            </div>
+<!-- SIDEBAR -->
+<div class="w-80 p-6 bg-black/60 backdrop-blur-xl border-r border-white/10 flex flex-col gap-6">
+  <div>
+    <h1 class="text-xl font-black tracking-widest">🚗 SENTINELDRIVE</h1>
+    <p class="text-xs text-slate-400">Driver Monitoring System</p>
+  </div>
 
-            <!-- MAR Metric (Yawn) -->
-            <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-4">
-                <div class="flex justify-between items-end mb-2">
-                    <span class="text-[10px] font-black text-slate-500 uppercase">Mouth (MAR)</span>
-                    <span id="mar-val" class="text-lg mono font-bold text-orange-400">0.00</span>
-                </div>
-                <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                    <div id="mar-bar" class="h-full bg-orange-500 transition-all duration-75" style="width: 0%"></div>
-                </div>
-            </div>
+  <div class="flex flex-col items-center gap-2">
+    <div id="statusRing"
+      class="w-28 h-28 rounded-full border-4 border-emerald-400 glow-green flex items-center justify-center">
+      <span id="statusText" class="text-lg font-bold">NORMAL</span>
+    </div>
+    <p class="text-xs text-slate-400 tracking-widest">STATE</p>
+  </div>
 
-            <!-- Head Pitch -->
-            <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-4">
-                <div class="flex justify-between items-end mb-2">
-                    <span class="text-[10px] font-black text-slate-500 uppercase">Head Tilt</span>
-                    <span id="pitch-val" class="text-lg mono font-bold text-emerald-400">0°</span>
-                </div>
-                <div class="flex gap-1">
-                    <div id="pitch-up" class="h-1 flex-1 bg-slate-800 rounded-full"></div>
-                    <div id="pitch-down" class="h-1 flex-1 bg-slate-800 rounded-full"></div>
-                </div>
-            </div>
+  <div>
+    <p class="text-xs text-slate-400">EAR</p>
+    <div class="h-2 bg-slate-800 rounded">
+      <div id="earBar" class="h-2 bg-blue-500 rounded"></div>
+    </div>
+    <p id="earVal" class="text-sm">0.00</p>
+  </div>
 
-            <!-- Event Log -->
-            <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 flex-1">
-                <h3 class="text-[10px] font-black text-slate-500 uppercase mb-3">System Log</h3>
-                <div id="log-container" class="space-y-2 text-[10px] mono text-slate-400 max-h-40 overflow-y-auto">
-                    <div>> Initializing Sentinel OS...</div>
-                </div>
-            </div>
+  <div>
+    <p class="text-xs text-slate-400">MAR</p>
+    <div class="h-2 bg-slate-800 rounded">
+      <div id="marBar" class="h-2 bg-orange-500 rounded"></div>
+    </div>
+    <p id="marVal" class="text-sm">0.00</p>
+  </div>
 
-            <button id="start-btn" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-30">
-                INIT SENSORS
-            </button>
-        </div>
+  <div>
+    <p class="text-xs text-slate-400 mb-1">FATIGUE SCORE</p>
+    <canvas id="fatigueChart" height="80"></canvas>
+  </div>
 
-        <!-- Main Viewport -->
-        <div class="lg:col-span-3 flex flex-col gap-4">
-            <div id="viewport" class="relative flex-1 bg-black rounded-3xl overflow-hidden border-2 border-slate-800 group">
-                <div class="scanning-line"></div>
-                <video id="webcam" class="absolute inset-0 w-full h-full object-cover opacity-40 grayscale" autoplay playsinline muted></video>
-                <canvas id="output_canvas" class="absolute inset-0 w-full h-full z-10"></canvas>
-                
-                <!-- HUD Overlays -->
-                <div class="absolute top-4 left-4 z-20 space-y-2">
-                    <div class="px-2 py-1 bg-black/60 backdrop-blur-md rounded border border-blue-500/30 text-[9px] mono text-blue-400 font-bold uppercase tracking-widest">
-                        Infrared Sim Active
-                    </div>
-                </div>
+  <p class="text-xs text-slate-500 mt-auto tracking-widest">
+    LIVE VEHICLE SAFETY MONITOR
+  </p>
+</div>
 
-                <div id="overlay-msg" class="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/80">
-                    <div class="text-center">
-                        <div class="inline-block p-4 rounded-full bg-blue-500/10 mb-4 animate-pulse">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                        </div>
-                        <h2 class="text-xl font-bold">Awaiting Calibration</h2>
-                        <p class="text-slate-500 text-sm max-w-xs mx-auto mt-2">Position camera at eye level for optimal fatigue tracking.</p>
-                    </div>
-                </div>
+<!-- CAMERA -->
+<div class="flex-1 relative">
+  <img id="video" class="absolute inset-0 w-full h-full object-cover scale-x-[-1] opacity-80">
+  <canvas id="hud" class="absolute inset-0 w-full h-full scale-x-[-1]"></canvas>
 
-                <!-- Critical Alert -->
-                <div id="master-alert" class="hidden absolute inset-0 z-40 bg-red-600/20 backdrop-blur-sm flex items-center justify-center border-[16px] border-red-600 animate-pulse">
-                    <div class="text-center text-white">
-                        <div class="text-8xl font-black tracking-tighter mb-2">WAKE UP!</div>
-                        <div class="text-2xl font-bold bg-white text-red-600 px-6 py-2 rounded-full inline-block">CRITICAL FATIGUE</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </main>
+  <div id="alert"
+    class="hidden absolute inset-0 bg-red-600/30 backdrop-blur-sm flex flex-col items-center justify-center z-50">
+    <h1 class="text-7xl font-black pulse">CRITICAL ALERT</h1>
+    <p class="mt-4 text-xl">DRIVER DROWSINESS</p>
+  </div>
+</div>
 
-    <script type="module">
-        import { FaceLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
+<script type="module">
+import { FaceLandmarker, FilesetResolver } from
+  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
 
-        const video = document.getElementById("webcam");
-        const canvas = document.getElementById("output_canvas");
-        const ctx = canvas.getContext("2d");
-        const startBtn = document.getElementById("start-btn");
-        const masterAlert = document.getElementById("master-alert");
-        const logContainer = document.getElementById("log-container");
-        
-        // Settings
-        const EAR_THRESHOLD = 0.21;
-        const MAR_THRESHOLD = 0.65;
-        const PITCH_THRESHOLD = 0.15; // Vertical tilt
-        const ALERT_DELAY = 1200; // ms
+const socket = io();
+const img = document.getElementById("video");
+const hud = document.getElementById("hud");
+const hctx = hud.getContext("2d");
 
-        let faceLandmarker;
-        let closureStart = null;
-        let isMuted = false;
-        let audioCtx, oscillator;
-        let lastLogTime = 0;
+const earVal = document.getElementById("earVal");
+const marVal = document.getElementById("marVal");
+const earBar = document.getElementById("earBar");
+const marBar = document.getElementById("marBar");
 
-        // Logging helper
-        function addLog(msg) {
-            const div = document.createElement('div');
-            div.innerText = `> ${new Date().toLocaleTimeString()}: ${msg}`;
-            logContainer.prepend(div);
-            if (logContainer.children.length > 20) logContainer.lastChild.remove();
-        }
+const statusRing = document.getElementById("statusRing");
+const statusText = document.getElementById("statusText");
+const alertBox = document.getElementById("alert");
 
-        // Alarm system
-        function triggerAlarm(active) {
-            if (isMuted || !active) {
-                if (oscillator) { oscillator.stop(); oscillator = null; }
-                return;
-            }
-            if (!oscillator) {
-                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                oscillator = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                oscillator.type = 'sawtooth';
-                oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
-                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-                oscillator.connect(gain);
-                gain.connect(audioCtx.destination);
-                oscillator.start();
-            }
-        }
+const fcan = document.getElementById("fatigueChart");
+const fctx = fcan.getContext("2d");
 
-        // Core logic: EAR and MAR
-        function calculateMetrics(landmarks) {
-            const dist = (p1, p2) => Math.hypot(p1.x - p2.x, p1.y - p2.y);
-            
-            // EAR (Eyes)
-            const eyeDist = (p) => (dist(p[1], p[5]) + dist(p[2], p[4])) / (2 * dist(p[0], p[3]));
-            const leftIndices = [33, 160, 158, 133, 153, 144].map(i => landmarks[i]);
-            const rightIndices = [362, 385, 387, 263, 373, 380].map(i => landmarks[i]);
-            const ear = (eyeDist(leftIndices) + eyeDist(rightIndices)) / 2;
+let fatigue = 0, history = [];
+let state = "NORMAL", drowsyStart = null;
+let alarm = false, audioCtx, osc;
 
-            // MAR (Mouth)
-            const mouthIndices = [61, 291, 13, 14, 81, 178, 311, 402].map(i => landmarks[i]);
-            // Horizontal 61-291, Vertical 13-14 and average of outer points
-            const mouthH = dist(landmarks[61], landmarks[291]);
-            const mouthV = (dist(landmarks[13], landmarks[14]) + dist(landmarks[81], landmarks[178]) + dist(landmarks[311], landmarks[402])) / 3;
-            const mar = mouthV / mouthH;
+function buzzer(on) {
+  if (on && !alarm) {
+    audioCtx = new AudioContext();
+    osc = audioCtx.createOscillator();
+    osc.frequency.value = 900;
+    osc.connect(audioCtx.destination);
+    osc.start();
+    alarm = true;
+  }
+  if (!on && alarm) {
+    osc.stop();
+    alarm = false;
+  }
+}
 
-            // Pitch (Head Nod)
-            // Simplified: distance between nose (1) and chin (152) vs eye line
-            const headPitch = landmarks[1].y - ((landmarks[33].y + landmarks[263].y) / 2);
+function resizeHUD() {
+  hud.width = img.clientWidth;
+  hud.height = img.clientHeight;
+}
+window.addEventListener("resize", resizeHUD);
 
-            return { ear, mar, headPitch };
-        }
+const vision = await FilesetResolver.forVisionTasks(
+  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+);
 
-        async function init() {
-            const filesetResolver = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
-            faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
-                baseOptions: {
-                    modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
-                    delegate: "GPU"
-                },
-                runningMode: "VIDEO",
-                numFaces: 1
-            });
-            document.getElementById("connection-status").innerHTML = `<div class="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_5px_#22c55e]"></div> ENGINE ONLINE`;
-            startBtn.disabled = false;
-        }
+const landmarker = await FaceLandmarker.createFromOptions(vision, {
+  baseOptions: {
+    modelAssetPath:
+      "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+    delegate: "GPU"
+  },
+  runningMode: "IMAGE",
+  numFaces: 1
+});
 
-        async function loop() {
-            const results = faceLandmarker.detectForVideo(video, performance.now());
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+const dist = (a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 
-            if (results.faceLandmarks && results.faceLandmarks[0]) {
-                const landmarks = results.faceLandmarks[0];
-                const { ear, mar, headPitch } = calculateMetrics(landmarks);
+socket.on("camera_frame", (b64) => {
+  img.src = "data:image/jpeg;base64," + b64;
+  resizeHUD();
 
-                // Update UI
-                document.getElementById("ear-val").innerText = ear.toFixed(3);
-                document.getElementById("ear-bar").style.width = `${Math.min(ear * 300, 100)}%`;
-                document.getElementById("mar-val").innerText = mar.toFixed(3);
-                document.getElementById("mar-bar").style.width = `${Math.min(mar * 100, 100)}%`;
-                document.getElementById("pitch-val").innerText = Math.round(headPitch * 100) + "°";
-                
-                // Fatigue Decision Matrix
-                const isEyesClosed = ear < EAR_THRESHOLD;
-                const isYawning = mar > MAR_THRESHOLD;
-                const isNodding = headPitch > PITCH_THRESHOLD;
+  const res = landmarker.detect(img);
+  if (!res.faceLandmarks?.[0]) return;
 
-                if (isEyesClosed || isNodding) {
-                    if (!closureStart) closureStart = Date.now();
-                    const duration = Date.now() - closureStart;
-                    if (duration > ALERT_DELAY) {
-                        masterAlert.classList.remove("hidden");
-                        triggerAlarm(true);
-                        // Log to backend if 5 seconds passed since last log
-                        if (Date.now() - lastLogTime > 5000) {
-                            fetch('/api/log-event', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ timestamp: new Date().toISOString(), type: isNodding ? 'NODDING' : 'DROWSY', earValue: ear })
-                            });
-                            addLog(isNodding ? "ALERT: Head Nod detected" : "ALERT: Persistent eye closure");
-                            lastLogTime = Date.now();
-                        }
-                    }
-                } else {
-                    closureStart = null;
-                    masterAlert.classList.add("hidden");
-                    triggerAlarm(false);
-                }
+  const lm = res.faceLandmarks[0];
 
-                if (isYawning && Date.now() - lastLogTime > 5000) {
-                    addLog("Warning: Yawn detected");
-                    lastLogTime = Date.now();
-                }
+  // HUD
+  hctx.clearRect(0,0,hud.width,hud.height);
+  hctx.fillStyle = "rgba(59,130,246,.8)";
+  [33,133,362,263,13,14].forEach(i=>{
+    const p = lm[i];
+    hctx.beginPath();
+    hctx.arc(p.x*hud.width,p.y*hud.height,3,0,Math.PI*2);
+    hctx.fill();
+  });
 
-                // Visual Landmark Debug (Selective)
-                ctx.fillStyle = (isEyesClosed || isNodding) ? "#ef4444" : "#3b82f6";
-                [1, 33, 263, 61, 291].forEach(i => {
-                    const p = landmarks[i];
-                    ctx.beginPath();
-                    ctx.arc(p.x * canvas.width, p.y * canvas.height, 3, 0, 2 * Math.PI);
-                    ctx.fill();
-                });
-            }
+  const ear =
+    ((dist(lm[160],lm[144])+dist(lm[158],lm[153])) /
+    (2*dist(lm[33],lm[133])) +
+    (dist(lm[385],lm[380])+dist(lm[387],lm[373])) /
+    (2*dist(lm[362],lm[263]))) / 2;
 
-            window.requestAnimationFrame(loop);
-        }
+  const mar = dist(lm[13],lm[14]) / dist(lm[78],lm[308]);
 
-        startBtn.addEventListener("click", () => {
-            navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
-                video.srcObject = stream;
-                document.getElementById("overlay-msg").classList.add("hidden");
-                startBtn.classList.add("hidden");
-                video.addEventListener("loadeddata", () => {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    loop();
-                });
-            });
-        });
+  earVal.innerText = ear.toFixed(2);
+  marVal.innerText = mar.toFixed(2);
+  earBar.style.width = Math.min(ear*300,100)+"%";
+  marBar.style.width = Math.min(mar*200,100)+"%";
 
-        document.getElementById("mute-btn").addEventListener("click", () => {
-            isMuted = !isMuted;
-            document.getElementById("mute-icon").style.color = isMuted ? "#ef4444" : "white";
-        });
+  // Fatigue
+  if (ear < 0.22) fatigue += 2;
+  if (mar > 0.6) fatigue += 1;
+  fatigue = Math.max(0, Math.min(100, fatigue - 0.5));
+  history.push(fatigue);
+  if (history.length > 100) history.shift();
 
-        init();
-    </script>
+  fctx.clearRect(0,0,fcan.width,fcan.height);
+  fctx.strokeStyle = "#22c55e";
+  fctx.beginPath();
+  history.forEach((v,i)=>{
+    const x=i/history.length*fcan.width;
+    const y=fcan.height-(v/100)*fcan.height;
+    i?fctx.lineTo(x,y):fctx.moveTo(x,y);
+  });
+  fctx.stroke();
+
+  const now = Date.now();
+  const drowsy = ear < 0.22 || mar > 0.6;
+  if (drowsy && !drowsyStart) drowsyStart = now;
+  if (!drowsy) drowsyStart = null;
+
+  if (!drowsy) state="NORMAL";
+  else if (now-drowsyStart<1500) state="WARNING";
+  else state="CRITICAL";
+
+  if (state==="NORMAL") {
+    statusText.innerText="NORMAL";
+    statusRing.className="w-28 h-28 rounded-full border-4 border-emerald-400 glow-green flex items-center justify-center";
+    alertBox.classList.add("hidden");
+    buzzer(false);
+  } else if (state==="WARNING") {
+    statusText.innerText="WARNING";
+    statusRing.className="w-28 h-28 rounded-full border-4 border-yellow-400 glow-yellow pulse flex items-center justify-center";
+    alertBox.classList.add("hidden");
+    buzzer(false);
+  } else {
+    statusText.innerText="CRITICAL";
+    statusRing.className="w-28 h-28 rounded-full border-4 border-red-500 glow-red pulse flex items-center justify-center";
+    alertBox.classList.remove("hidden");
+    buzzer(true);
+  }
+});
+</script>
 </body>
 </html>
