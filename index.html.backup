@@ -80,14 +80,14 @@ body {
   </div>
 </div>
 
-<script type="module">
-import { FaceLandmarker, FilesetResolver } from
-  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
-
-const video = document.getElementById("video");
+<scripvideo = document.getElementById("video");
 const hud = document.getElementById("hud");
 const hctx = hud.getContext("2d");
-const cameraInfo = document.getElementById("cameraInfo");
+const cameraInfo = document.getElementById("cameraInfo
+const socket = io();
+const img = document.getElementById("video");
+const hud = document.getElementById("hud");
+const hctx = hud.getContext("2d");
 
 const earVal = document.getElementById("earVal");
 const marVal = document.getElementById("marVal");
@@ -117,11 +117,7 @@ function buzzer(on) {
   if (!on && alarm) {
     osc.stop();
     alarm = false;
-  }
-}
-
-function resizeHUD() {
-  hud.width = video.clientWidth;
+  }video.clientWidth;
   hud.height = video.clientHeight;
 }
 window.addEventListener("resize", resizeHUD);
@@ -155,74 +151,6 @@ async function initCamera() {
       video.onloadedmetadata = () => {
         video.play();
         resolve();
-      };
-    });
-    
-    resizeHUD();
-    return true;
-  } catch (error) {
-    console.error("❌ Camera error:", error);
-    cameraInfo.textContent = "Failed to access camera";
-    cameraInfo.classList.add("text-red-500");
-    return false;
-  }
-}
-
-const dist = (a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
-
-let landmarker;
-
-// Initialize everything
-async function init() {
-  try {
-    console.log("🔄 Initializing MediaPipe...");
-    cameraInfo.textContent = "Loading MediaPipe...";
-    
-    // Initialize MediaPipe
-    const vision = await FilesetResolver.forVisionTasks(
-      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
-    );
-
-    landmarker = await FaceLandmarker.createFromOptions(vision, {
-      baseOptions: {
-        modelAssetPath:
-          "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
-        delegate: "GPU"
-      },
-      runningMode: "VIDEO",
-      numFaces: 1
-    });
-    
-    console.log("✅ MediaPipe loaded");
-
-    // Start camera
-    console.log("🎥 Requesting camera...");
-    const cameraStarted = await initCamera();
-    
-    if (cameraStarted) {
-      console.log("✅ Starting detection...");
-      processFrame();
-    } else {
-      console.error("❌ Camera failed to start");
-    }
-  } catch (error) {
-    console.error("❌ Initialization error:", error);
-    cameraInfo.textContent = "Initialization failed: " + error.message;
-    cameraInfo.classList.add("text-red-500");
-  }
-}
-
-// Process video frames
-function processFrame() {
-  if (video.readyState === video.HAVE_ENOUGH_DATA) {
-    const now = performance.now();
-    
-    // Detect face landmarks
-    const res = landmarker.detectForVideo(video, now);
-    
-    if (res.faceLandmarks?.[0]) {
-      const lm = res.faceLandmarks[0];
-
       // HUD
       hctx.clearRect(0,0,hud.width,hud.height);
       hctx.fillStyle = "rgba(59,130,246,.8)";
@@ -294,8 +222,57 @@ function processFrame() {
   requestAnimationFrame(processFrame);
 }
 
-// Start initialization
-init();
+// Start processing
+processFrame( const mar = dist(lm[13],lm[14]) / dist(lm[78],lm[308]);
+
+  earVal.innerText = ear.toFixed(2);
+  marVal.innerText = mar.toFixed(2);
+  earBar.style.width = Math.min(ear*300,100)+"%";
+  marBar.style.width = Math.min(mar*200,100)+"%";
+
+  // Fatigue
+  if (ear < 0.22) fatigue += 2;
+  if (mar > 0.6) fatigue += 1;
+  fatigue = Math.max(0, Math.min(100, fatigue - 0.5));
+  history.push(fatigue);
+  if (history.length > 100) history.shift();
+
+  fctx.clearRect(0,0,fcan.width,fcan.height);
+  fctx.strokeStyle = "#22c55e";
+  fctx.beginPath();
+  history.forEach((v,i)=>{
+    const x=i/history.length*fcan.width;
+    const y=fcan.height-(v/100)*fcan.height;
+    i?fctx.lineTo(x,y):fctx.moveTo(x,y);
+  });
+  fctx.stroke();
+
+  const now = Date.now();
+  const drowsy = ear < 0.22 || mar > 0.6;
+  if (drowsy && !drowsyStart) drowsyStart = now;
+  if (!drowsy) drowsyStart = null;
+
+  if (!drowsy) state="NORMAL";
+  else if (now-drowsyStart<1500) state="WARNING";
+  else state="CRITICAL";
+
+  if (state==="NORMAL") {
+    statusText.innerText="NORMAL";
+    statusRing.className="w-28 h-28 rounded-full border-4 border-emerald-400 glow-green flex items-center justify-center";
+    alertBox.classList.add("hidden");
+    buzzer(false);
+  } else if (state==="WARNING") {
+    statusText.innerText="WARNING";
+    statusRing.className="w-28 h-28 rounded-full border-4 border-yellow-400 glow-yellow pulse flex items-center justify-center";
+    alertBox.classList.add("hidden");
+    buzzer(false);
+  } else {
+    statusText.innerText="CRITICAL";
+    statusRing.className="w-28 h-28 rounded-full border-4 border-red-500 glow-red pulse flex items-center justify-center";
+    alertBox.classList.remove("hidden");
+    buzzer(true);
+  }
+});
 </script>
 </body>
 </html>
